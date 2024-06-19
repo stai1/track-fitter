@@ -11,17 +11,35 @@ import { getDistance } from 'ol/sphere';
 import { Style, Stroke, Circle, Fill} from 'ol/style';
 import { CircleOnSphere, TrackOnSphere } from './TrackOnSphere';
 import { EARTH_AVERAGE_RADIUS_METERS } from './earth';
+import { UNFIT_DATA } from './data';
 
 const CENTER: [number, number] = [-122.25854118373765, 37.79438679073371];
 
-
 const TRACK_LINE_STYLE = new Style({
+  stroke: new Stroke({
+    color: '#00ff00',
+    width:3
+  })
+});
+const CONTROL_POINTS_STYLE = new Style({
+  image: new Circle({
+    radius:5,
+    fill: new Fill({
+      color: '#ffffff'
+    }),
+    stroke: new Stroke({
+      color: '#00ff00',
+      width:2
+    })
+  })
+});
+const ROUTE_LINE_STYLE = new Style({
   stroke: new Stroke({
     color: '#ff0000',
     width:3
   })
 });
-const TRACK_POINTS_STYLE = new Style({
+const ROUTE_POINTS_STYLE = new Style({
   image: new Circle({
     radius:5,
     fill: new Fill({
@@ -67,15 +85,17 @@ export class LineFitter {
       }),
     });
 
-    const feature = new Feature({geometry: new Point(fromLonLat(CENTER))})
-    feature.setStyle(TRACK_POINTS_STYLE);
+    const feature = new Feature({geometry: new Point(fromLonLat(CENTER))});
+    feature.setStyle(CONTROL_POINTS_STYLE);
     this.controlPointLayerSource.addFeature(feature);
 
     const trackOnSphere = new TrackOnSphere({
       straightLengthMeters: 100,
       sphereRadius: EARTH_AVERAGE_RADIUS_METERS,
-      centerDegrees: CENTER,
-      angle: -0.73,
+      orientation: {
+        centerDegrees: CENTER,
+        angle: -0.73,
+      },
       trackLengthMeters: 400,
     });
 
@@ -85,7 +105,23 @@ export class LineFitter {
     trackLineFeature.getGeometry()?.setCoordinates(trackCoordinates.map(coordinate => fromLonLat(coordinate)));
     trackLineFeature.setStyle(TRACK_LINE_STYLE);
     this.trackPathLayerSource.addFeature(trackLineFeature);
+
+    const fitData = UNFIT_DATA.map(coordinateDegrees => trackOnSphere.fitToTrack(coordinateDegrees).coordinate);
+    for(const data of [...UNFIT_DATA, ...fitData]) {
+      const dataPointFeature = new Feature({geometry: new Point(fromLonLat(data))});
+      dataPointFeature.setStyle(ROUTE_POINTS_STYLE);
+      this.routeLayerSource.addFeature(dataPointFeature);
+    }
+
+    const fitPath = trackOnSphere.fitPathToTrack(UNFIT_DATA);
+    const routeLineFeature: Feature<LineString> = new Feature<LineString>({geometry: new LineString([])});
+    routeLineFeature.getGeometry()?.setCoordinates(fitPath.map(point => fromLonLat(point.coordinate)));
+    routeLineFeature.setStyle(ROUTE_LINE_STYLE);
+    this.routeLayerSource.addFeature(routeLineFeature);
+    console.log(fitPath.map(value => value.lapProgress*400))
+
   }
+
 
 }
 
