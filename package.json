@@ -1,0 +1,23 @@
+{
+  "name": "track-fitter",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "parcel src/index.html",
+    "build": "parcel build --public-url . src/index.html",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "gh-pages": "^6.1.1",
+    "parcel": "^2.12.0",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "ol": "^9.2.4"
+  }
+}
