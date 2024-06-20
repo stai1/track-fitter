@@ -50,7 +50,7 @@ export function writeTCX(data: TcxData) {
   const activity = trainingCenterDatabase
     .appendChild(xmlDoc.createElement('Activities'))
     .appendChild(xmlDoc.createElement('Activity'));
-  activity.appendChild(xmlDoc.createElement('Id'));
+  activity.appendChild(xmlDoc.createElement('Id')).textContent = data.trackPoints[0].time;
   const lap = activity.appendChild(xmlDoc.createElement('Lap'));
   lap.setAttribute('StartTime', data.trackPoints[0].time);
   const track = lap.appendChild(xmlDoc.createElement('Track'));

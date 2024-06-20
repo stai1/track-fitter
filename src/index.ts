@@ -98,26 +98,7 @@ export class LineFitter {
       }),
     });
 
-    const feature = new Feature({geometry: new Point(fromLonLat(CENTER))});
-    feature.setStyle(CONTROL_POINTS_STYLE);
-    this.controlPointLayerSource.addFeature(feature);
-
-    this.trackOnSphere = new TrackOnSphere({
-      straightLengthMeters: 100,
-      sphereRadius: EARTH_AVERAGE_RADIUS_METERS,
-      orientation: {
-        centerDegrees: CENTER,
-        angle: -0.73,
-      },
-      trackLengthMeters: 400,
-    });
-
-    const trackCoordinates = this.trackOnSphere.trackPathCoordinates();
-    const trackLineFeature: Feature<LineString> = new Feature<LineString>({geometry: new LineString([])});
-
-    trackLineFeature.getGeometry()?.setCoordinates(trackCoordinates.map(coordinate => fromLonLat(coordinate)));
-    trackLineFeature.setStyle(TRACK_LINE_STYLE);
-    this.trackPathLayerSource.addFeature(trackLineFeature);
+    this.createTrack();
 
     // const fitData = UNFIT_DATA.map(coordinateDegrees => trackOnSphere.fitToTrack(coordinateDegrees).coordinate);
     // for(const data of [...UNFIT_DATA, ...fitData]) {
@@ -135,11 +116,29 @@ export class LineFitter {
 
   }
 
+  createTrack() {
+    this.controlPointLayerSource.clear();
+    const feature = new Feature({geometry: new Point(fromLonLat(CENTER))});
+    feature.setStyle(CONTROL_POINTS_STYLE);
+    this.controlPointLayerSource.addFeature(feature);
+
+    this.trackOnSphere = new TrackOnSphere(this.trackOnSphereDesc);
+
+    const trackCoordinates = this.trackOnSphere.trackPathCoordinates();
+    const trackLineFeature: Feature<LineString> = new Feature<LineString>({geometry: new LineString([])});
+
+    this.trackPathLayerSource.clear();
+    trackLineFeature.getGeometry()?.setCoordinates(trackCoordinates.map(coordinate => fromLonLat(coordinate)));
+    trackLineFeature.setStyle(TRACK_LINE_STYLE);
+    this.trackPathLayerSource.addFeature(trackLineFeature);
+  }
+
   loadTCX(fileContents: string) {
     this.data = parseTCX(fileContents);
     const routeLineFeature: Feature<LineString> = new Feature<LineString>({geometry: new LineString([])});
     routeLineFeature.getGeometry()?.setCoordinates(this.data.trackPoints.map(data => fromLonLat([data.lon, data.lat])));
     routeLineFeature.setStyle(ROUTE_LINE_STYLE);
+    this.routeLayerSource.clear();
     this.routeLayerSource.addFeature(routeLineFeature);
   }
 
@@ -166,6 +165,20 @@ export class LineFitter {
     this.routeLayerSource.addFeature(routeLineFeature);
   }
 
+  setLon(value: number) {
+    this.trackOnSphereDesc.orientation.centerDegrees[0] = value;
+    this.createTrack();
+  }
+
+  setLat(value: number) {
+    this.trackOnSphereDesc.orientation.centerDegrees[1] = value;
+    this.createTrack();
+  }
+
+  setAngle(value: number) {
+    this.trackOnSphereDesc.orientation.angle = value;
+    this.createTrack();
+  }
 
 }
 
@@ -197,4 +210,22 @@ formElement.addEventListener('submit', (ev: Event) => {
   downloadElement.href = window.URL.createObjectURL(blob);
   downloadElement.download = 'route' + '.tcx';
   downloadElement.click();
+});
+
+const lonElement = document.getElementById('lon') as HTMLInputElement;
+lonElement.value = app.trackOnSphereDesc.orientation.centerDegrees[0].toString();
+lonElement.addEventListener('input', (event) => {
+  app.setLon(Number((event.target as HTMLInputElement).value));
+});
+
+const latElement = document.getElementById('lat') as HTMLInputElement;
+latElement.value = app.trackOnSphereDesc.orientation.centerDegrees[1].toString();
+latElement.addEventListener('input', (event) => {
+  app.setLat(Number((event.target as HTMLInputElement).value));
+});
+
+const angleElement = document.getElementById('angle') as HTMLInputElement;
+angleElement.value = app.trackOnSphereDesc.orientation.angle.toString();
+angleElement.addEventListener('input', (event) => {
+  app.setAngle(Number((event.target as HTMLInputElement).value));
 });
