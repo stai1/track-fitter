@@ -9,6 +9,16 @@
     <div class="main">
       <div class="map-container" id="map"></div>
       <div class="side">
+        <div>
+          <button id="import">Import File</button>
+          <input type="file" id="import-input" style="display: none"/>
+        </div>
+        <div>
+          <button id="apply">Fit</button>
+        </div>
+        <form id="export" onsubmit="return false;">
+          <div><button type="submit">Export</button><a id="download" style="display: none"></a></div>
+        </form>
       </div>
     </div>
   </body>

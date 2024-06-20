@@ -9,16 +9,17 @@ import VectorSource from 'ol/source/Vector';
 import { fromLonLat, toLonLat } from 'ol/proj';
 import { getDistance } from 'ol/sphere';
 import { Style, Stroke, Circle, Fill} from 'ol/style';
-import { CircleOnSphere, TrackOnSphere } from './TrackOnSphere';
+import { CircleOnSphere, TrackOnSphere, TrackOnSphereDesc } from './TrackOnSphere';
 import { EARTH_AVERAGE_RADIUS_METERS } from './earth';
 import { UNFIT_DATA } from './data';
+import { TcxData, TrackPoint, parseTCX, writeTCX } from './tcx-parser';
 
 const CENTER: [number, number] = [-122.25854118373765, 37.79438679073371];
 
 const TRACK_LINE_STYLE = new Style({
   stroke: new Stroke({
     color: '#00ff00',
-    width:3
+    width:2
   })
 });
 const CONTROL_POINTS_STYLE = new Style({
@@ -60,6 +61,18 @@ export class LineFitter {
 
   draggingPointIndex: number;
   map: Map;
+  data: TcxData;
+  trackOnSphere: TrackOnSphere;
+  trackOnSphereDesc: TrackOnSphereDesc = {
+    straightLengthMeters: 100,
+    sphereRadius: EARTH_AVERAGE_RADIUS_METERS,
+    orientation: {
+      centerDegrees: CENTER,
+      angle: -0.73,
+    },
+    trackLengthMeters: 400,
+  };
+
   constructor() {
     let mapSource = new OSM();
 
@@ -89,7 +102,7 @@ export class LineFitter {
     feature.setStyle(CONTROL_POINTS_STYLE);
     this.controlPointLayerSource.addFeature(feature);
 
-    const trackOnSphere = new TrackOnSphere({
+    this.trackOnSphere = new TrackOnSphere({
       straightLengthMeters: 100,
       sphereRadius: EARTH_AVERAGE_RADIUS_METERS,
       orientation: {
@@ -99,30 +112,89 @@ export class LineFitter {
       trackLengthMeters: 400,
     });
 
-    const trackCoordinates = trackOnSphere.trackPathCoordinates();
+    const trackCoordinates = this.trackOnSphere.trackPathCoordinates();
     const trackLineFeature: Feature<LineString> = new Feature<LineString>({geometry: new LineString([])});
 
     trackLineFeature.getGeometry()?.setCoordinates(trackCoordinates.map(coordinate => fromLonLat(coordinate)));
     trackLineFeature.setStyle(TRACK_LINE_STYLE);
     this.trackPathLayerSource.addFeature(trackLineFeature);
 
-    const fitData = UNFIT_DATA.map(coordinateDegrees => trackOnSphere.fitToTrack(coordinateDegrees).coordinate);
-    for(const data of [...UNFIT_DATA, ...fitData]) {
-      const dataPointFeature = new Feature({geometry: new Point(fromLonLat(data))});
-      dataPointFeature.setStyle(ROUTE_POINTS_STYLE);
-      this.routeLayerSource.addFeature(dataPointFeature);
-    }
+    // const fitData = UNFIT_DATA.map(coordinateDegrees => trackOnSphere.fitToTrack(coordinateDegrees).coordinate);
+    // for(const data of [...UNFIT_DATA, ...fitData]) {
+    //   const dataPointFeature = new Feature({geometry: new Point(fromLonLat(data))});
+    //   dataPointFeature.setStyle(ROUTE_POINTS_STYLE);
+    //   this.routeLayerSource.addFeature(dataPointFeature);
+    // }
 
-    const fitPath = trackOnSphere.fitPathToTrack(UNFIT_DATA);
+    // const fitPath = trackOnSphere.fitPathToTrack(UNFIT_DATA);
+    // const routeLineFeature: Feature<LineString> = new Feature<LineString>({geometry: new LineString([])});
+    // routeLineFeature.getGeometry()?.setCoordinates(fitPath.map(point => fromLonLat(point.coordinate)));
+    // routeLineFeature.setStyle(ROUTE_LINE_STYLE);
+    // this.routeLayerSource.addFeature(routeLineFeature);
+    // console.log(fitPath.map(value => value.lapProgress*400))
+
+  }
+
+  loadTCX(fileContents: string) {
+    this.data = parseTCX(fileContents);
     const routeLineFeature: Feature<LineString> = new Feature<LineString>({geometry: new LineString([])});
-    routeLineFeature.getGeometry()?.setCoordinates(fitPath.map(point => fromLonLat(point.coordinate)));
+    routeLineFeature.getGeometry()?.setCoordinates(this.data.trackPoints.map(data => fromLonLat([data.lon, data.lat])));
     routeLineFeature.setStyle(ROUTE_LINE_STYLE);
     this.routeLayerSource.addFeature(routeLineFeature);
-    console.log(fitPath.map(value => value.lapProgress*400))
+  }
 
+  exportTCX() {
+    return writeTCX(this.data);
+  }
+
+  fitPath() {
+    if(!this.data) {
+      return;
+    }
+    const dataCoords = this.data.trackPoints.map(value => [value.lon, value.lat] as [number, number]);
+    const fitPath = this.trackOnSphere.fitPathToTrack(dataCoords);
+    for(let i = 0; i < this.data.trackPoints.length; ++i) {
+      this.data.trackPoints[i].lon = fitPath[i].coordinate[0];
+      this.data.trackPoints[i].lat = fitPath[i].coordinate[1];
+      this.data.trackPoints[i].distance = fitPath[i].lapProgress * this.trackOnSphereDesc.trackLengthMeters;
+    }
+
+    this.routeLayerSource.clear();
+    const routeLineFeature: Feature<LineString> = new Feature<LineString>({geometry: new LineString([])});
+    routeLineFeature.getGeometry()?.setCoordinates(this.data.trackPoints.map(data => fromLonLat([data.lon, data.lat])));
+    routeLineFeature.setStyle(ROUTE_LINE_STYLE);
+    this.routeLayerSource.addFeature(routeLineFeature);
   }
 
 
 }
 
 const app = new LineFitter();
+
+document.getElementById('import')?.addEventListener('click', () => {
+  document.getElementById('import-input')?.click();
+});
+const importInput = document.getElementById('import-input') as HTMLInputElement;
+importInput.addEventListener('change', (event) =>{
+  const reader = new FileReader();
+  reader.onload = event => {
+    app.loadTCX(event.target?.result as string);
+  };
+  const file = (<HTMLInputElement> event.target).files?.[0];
+  reader.readAsText(file as Blob, 'UTF-8');
+});
+
+document.getElementById('apply')?.addEventListener('click', () => {
+  app.fitPath();
+});
+
+const formElement = document.getElementById('export') as HTMLFormElement;
+formElement.addEventListener('submit', (ev: Event) => {
+
+  const blob = new Blob([app.exportTCX()], {type: 'octet/stream'});
+
+  const downloadElement = document.getElementById('download') as HTMLAnchorElement;
+  downloadElement.href = window.URL.createObjectURL(blob);
+  downloadElement.download = 'route' + '.tcx';
+  downloadElement.click();
+});
