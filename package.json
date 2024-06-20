@@ -2,13 +2,12 @@
   "name": "track-fitter",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "parcel src/index.html",
     "build": "parcel build --public-url . src/index.html",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d build"
+    "deploy": "gh-pages -d dist"
   },
   "author": "",
   "license": "ISC",
