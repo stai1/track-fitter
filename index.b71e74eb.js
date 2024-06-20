@@ -37123,6 +37123,7 @@ function writeTCX(data) {
     const xmlDoc = document.implementation.createDocument(null, "TrainingCenterDatabase", null);
     const trainingCenterDatabase = xmlDoc.documentElement;
     const activity = trainingCenterDatabase.appendChild(xmlDoc.createElement("Activities")).appendChild(xmlDoc.createElement("Activity"));
+    activity.setAttribute("Sport", "Running");
     activity.appendChild(xmlDoc.createElement("Id")).textContent = data.trackPoints[0].time;
     const lap = activity.appendChild(xmlDoc.createElement("Lap"));
     lap.setAttribute("StartTime", data.trackPoints[0].time);
@@ -37135,10 +37136,10 @@ function writeTCX(data) {
         position.appendChild(xmlDoc.createElement("LatitudeDegrees")).textContent = String(point.lat);
         position.appendChild(xmlDoc.createElement("LongitudeDegrees")).textContent = String(point.lon);
         if (point.hr) trackpointElement.appendChild(xmlDoc.createElement("HeartRateBpm")).appendChild(xmlDoc.createElement("Value")).textContent = String(point.hr);
-        const tpx = position.appendChild(xmlDoc.createElement("Extensions")).appendChild(xmlDoc.createElement("TPX"));
-        if (point.speed) tpx.appendChild(xmlDoc.createElement("Speed")).textContent;
-        if (point.cadence) tpx.appendChild(xmlDoc.createElement("RunCadence")).textContent;
-        if (point.watts) tpx.appendChild(xmlDoc.createElement("Watts")).textContent;
+        const tpx = trackpointElement.appendChild(xmlDoc.createElement("Extensions")).appendChild(xmlDoc.createElement("TPX"));
+        if (point.speed) tpx.appendChild(xmlDoc.createElement("Speed")).textContent = String(point.speed);
+        if (point.cadence) tpx.appendChild(xmlDoc.createElement("RunCadence")).textContent = String(point.cadence);
+        if (point.watts) tpx.appendChild(xmlDoc.createElement("Watts")).textContent = String(point.watts);
     }
     return '<?xml version="1.0" encoding="UTF-8"?>' + new XMLSerializer().serializeToString(xmlDoc);
 }
