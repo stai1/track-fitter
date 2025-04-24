@@ -71,6 +71,8 @@ export class LineFitter {
       angle: -0.73,
     },
     trackLengthMeters: 400,
+    laneWidth: 1.07,
+    lane: 1,
   };
 
   constructor() {
@@ -180,6 +182,20 @@ export class LineFitter {
     this.createTrack();
   }
 
+  setLaneWidth(value: number) {
+    this.trackOnSphereDesc.laneWidth = value;
+    this.createTrack();
+  }
+
+  setLane(value: number) {
+    if(!value || value < 1) {
+      this.trackOnSphereDesc.lane;
+    }
+    else {
+      this.trackOnSphereDesc.lane = value;
+    }
+    this.createTrack();
+  }
 }
 
 const app = new LineFitter();
@@ -228,4 +244,16 @@ const angleElement = document.getElementById('angle') as HTMLInputElement;
 angleElement.value = app.trackOnSphereDesc.orientation.angle.toString();
 angleElement.addEventListener('input', (event) => {
   app.setAngle(Number((event.target as HTMLInputElement).value));
+});
+
+const laneWidthElement = document.getElementById('laneWidth') as HTMLInputElement;
+laneWidthElement.value = app.trackOnSphereDesc.laneWidth.toString();
+laneWidthElement.addEventListener('input', (event) => {
+  app.setLaneWidth(Number((event.target as HTMLInputElement).value));
+});
+
+const lane = document.getElementById('lane') as HTMLInputElement;
+lane.value = app.trackOnSphereDesc.lane.toString();
+lane.addEventListener('input', (event) => {
+  app.setLane(Number((event.target as HTMLInputElement).value));
 });

@@ -22,6 +22,16 @@ export interface TrackOnSphereDesc {
   }
 
   trackLengthMeters: number;
+
+  /**
+   * Meters, commonly 1.22 or 1.07 (high school)
+   */
+  laneWidth: number;
+
+  /**
+   * Lane number, 1-indexed
+   */
+  lane: number;
 }
 
 function radians<T extends number[]>(array: T): T {
@@ -169,7 +179,9 @@ export class TrackOnSphere {
     this.center = radians(desc.orientation.centerDegrees)
     this.angle = desc.orientation.angle;
 
-    this.trackLength = desc.trackLengthMeters/this.sphereRadius;
+    const laneTrackLength = desc.trackLengthMeters + desc.laneWidth * (desc.lane - 1) * Math.PI;
+
+    this.trackLength = laneTrackLength/this.sphereRadius;
     this.straightLength = desc.straightLengthMeters/this.sphereRadius;
     this.curveLength = (this.trackLength/2 - this.straightLength);
     this.curveLinearRadius = this.curveLength/Math.PI;
