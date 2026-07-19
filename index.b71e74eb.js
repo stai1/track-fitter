@@ -600,7 +600,7 @@ var _proj = require("ol/proj");
 var _style = require("ol/style");
 var _trackOnSphere = require("./TrackOnSphere");
 var _earth = require("./earth");
-var _tcxParser = require("./tcx-parser");
+var _data = require("./data");
 const CENTER = [
     -122.25854118373765,
     37.79438679073371
@@ -608,7 +608,7 @@ const CENTER = [
 const TRACK_LINE_STYLE = new (0, _style.Style)({
     stroke: new (0, _style.Stroke)({
         color: "#00ff00",
-        width: 2
+        width: 3
     })
 });
 const CONTROL_POINTS_STYLE = new (0, _style.Style)({
@@ -652,15 +652,6 @@ class LineFitter {
         this.controlPointLayerSource = new (0, _vectorDefault.default)({
             wrapX: true
         });
-        this.trackOnSphereDesc = {
-            straightLengthMeters: 100,
-            sphereRadius: (0, _earth.EARTH_AVERAGE_RADIUS_METERS),
-            orientation: {
-                centerDegrees: CENTER,
-                angle: -0.73
-            },
-            trackLengthMeters: 400
-        };
         let mapSource = new (0, _source.OSM)();
         this.map = new (0, _ol.Map)({
             target: "map",
@@ -691,134 +682,51 @@ class LineFitter {
                 zoom: 19
             })
         });
-        this.createTrack();
-    // const fitData = UNFIT_DATA.map(coordinateDegrees => trackOnSphere.fitToTrack(coordinateDegrees).coordinate);
-    // for(const data of [...UNFIT_DATA, ...fitData]) {
-    //   const dataPointFeature = new Feature({geometry: new Point(fromLonLat(data))});
-    //   dataPointFeature.setStyle(ROUTE_POINTS_STYLE);
-    //   this.routeLayerSource.addFeature(dataPointFeature);
-    // }
-    // const fitPath = trackOnSphere.fitPathToTrack(UNFIT_DATA);
-    // const routeLineFeature: Feature<LineString> = new Feature<LineString>({geometry: new LineString([])});
-    // routeLineFeature.getGeometry()?.setCoordinates(fitPath.map(point => fromLonLat(point.coordinate)));
-    // routeLineFeature.setStyle(ROUTE_LINE_STYLE);
-    // this.routeLayerSource.addFeature(routeLineFeature);
-    // console.log(fitPath.map(value => value.lapProgress*400))
-    }
-    createTrack() {
-        this.controlPointLayerSource.clear();
         const feature = new (0, _ol.Feature)({
             geometry: new (0, _geom.Point)((0, _proj.fromLonLat)(CENTER))
         });
         feature.setStyle(CONTROL_POINTS_STYLE);
         this.controlPointLayerSource.addFeature(feature);
-        this.trackOnSphere = new (0, _trackOnSphere.TrackOnSphere)(this.trackOnSphereDesc);
-        const trackCoordinates = this.trackOnSphere.trackPathCoordinates();
+        const trackOnSphere = new (0, _trackOnSphere.TrackOnSphere)({
+            straightLengthMeters: 100,
+            sphereRadius: (0, _earth.EARTH_AVERAGE_RADIUS_METERS),
+            orientation: {
+                centerDegrees: CENTER,
+                angle: -0.73
+            },
+            trackLengthMeters: 400
+        });
+        const trackCoordinates = trackOnSphere.trackPathCoordinates();
         const trackLineFeature = new (0, _ol.Feature)({
             geometry: new (0, _geom.LineString)([])
         });
-        this.trackPathLayerSource.clear();
         trackLineFeature.getGeometry()?.setCoordinates(trackCoordinates.map((coordinate)=>(0, _proj.fromLonLat)(coordinate)));
         trackLineFeature.setStyle(TRACK_LINE_STYLE);
         this.trackPathLayerSource.addFeature(trackLineFeature);
-    }
-    loadTCX(fileContents) {
-        this.data = (0, _tcxParser.parseTCX)(fileContents);
-        const routeLineFeature = new (0, _ol.Feature)({
-            geometry: new (0, _geom.LineString)([])
-        });
-        routeLineFeature.getGeometry()?.setCoordinates(this.data.trackPoints.map((data)=>(0, _proj.fromLonLat)([
-                data.lon,
-                data.lat
-            ])));
-        routeLineFeature.setStyle(ROUTE_LINE_STYLE);
-        this.routeLayerSource.clear();
-        this.routeLayerSource.addFeature(routeLineFeature);
-    }
-    exportTCX() {
-        return (0, _tcxParser.writeTCX)(this.data);
-    }
-    fitPath() {
-        if (!this.data) return;
-        const dataCoords = this.data.trackPoints.map((value)=>[
-                value.lon,
-                value.lat
-            ]);
-        const fitPath = this.trackOnSphere.fitPathToTrack(dataCoords);
-        for(let i = 0; i < this.data.trackPoints.length; ++i){
-            this.data.trackPoints[i].lon = fitPath[i].coordinate[0];
-            this.data.trackPoints[i].lat = fitPath[i].coordinate[1];
-            this.data.trackPoints[i].distance = fitPath[i].lapProgress * this.trackOnSphereDesc.trackLengthMeters;
+        const fitData = (0, _data.UNFIT_DATA).map((coordinateDegrees)=>trackOnSphere.fitToTrack(coordinateDegrees).coordinate);
+        for (const data of [
+            ...(0, _data.UNFIT_DATA),
+            ...fitData
+        ]){
+            const dataPointFeature = new (0, _ol.Feature)({
+                geometry: new (0, _geom.Point)((0, _proj.fromLonLat)(data))
+            });
+            dataPointFeature.setStyle(ROUTE_POINTS_STYLE);
+            this.routeLayerSource.addFeature(dataPointFeature);
         }
-        this.routeLayerSource.clear();
+        const fitPath = trackOnSphere.fitPathToTrack((0, _data.UNFIT_DATA));
         const routeLineFeature = new (0, _ol.Feature)({
             geometry: new (0, _geom.LineString)([])
         });
-        routeLineFeature.getGeometry()?.setCoordinates(this.data.trackPoints.map((data)=>(0, _proj.fromLonLat)([
-                data.lon,
-                data.lat
-            ])));
+        routeLineFeature.getGeometry()?.setCoordinates(fitPath.map((point)=>(0, _proj.fromLonLat)(point.coordinate)));
         routeLineFeature.setStyle(ROUTE_LINE_STYLE);
         this.routeLayerSource.addFeature(routeLineFeature);
-    }
-    setLon(value) {
-        this.trackOnSphereDesc.orientation.centerDegrees[0] = value;
-        this.createTrack();
-    }
-    setLat(value) {
-        this.trackOnSphereDesc.orientation.centerDegrees[1] = value;
-        this.createTrack();
-    }
-    setAngle(value) {
-        this.trackOnSphereDesc.orientation.angle = value;
-        this.createTrack();
+        console.log(fitPath.map((value)=>value.lapProgress * 400));
     }
 }
 const app = new LineFitter();
-document.getElementById("import")?.addEventListener("click", ()=>{
-    document.getElementById("import-input")?.click();
-});
-const importInput = document.getElementById("import-input");
-importInput.addEventListener("change", (event)=>{
-    const reader = new FileReader();
-    reader.onload = (event)=>{
-        app.loadTCX(event.target?.result);
-    };
-    const file = event.target.files?.[0];
-    reader.readAsText(file, "UTF-8");
-});
-document.getElementById("apply")?.addEventListener("click", ()=>{
-    app.fitPath();
-});
-const formElement = document.getElementById("export");
-formElement.addEventListener("submit", (ev)=>{
-    const blob = new Blob([
-        app.exportTCX()
-    ], {
-        type: "octet/stream"
-    });
-    const downloadElement = document.getElementById("download");
-    downloadElement.href = window.URL.createObjectURL(blob);
-    downloadElement.download = "route.tcx";
-    downloadElement.click();
-});
-const lonElement = document.getElementById("lon");
-lonElement.value = app.trackOnSphereDesc.orientation.centerDegrees[0].toString();
-lonElement.addEventListener("input", (event)=>{
-    app.setLon(Number(event.target.value));
-});
-const latElement = document.getElementById("lat");
-latElement.value = app.trackOnSphereDesc.orientation.centerDegrees[1].toString();
-latElement.addEventListener("input", (event)=>{
-    app.setLat(Number(event.target.value));
-});
-const angleElement = document.getElementById("angle");
-angleElement.value = app.trackOnSphereDesc.orientation.angle.toString();
-angleElement.addEventListener("input", (event)=>{
-    app.setAngle(Number(event.target.value));
-});
 
-},{"ol/ol.css":"2wn4y","ol/source":"5x5oh","ol":"3a1E4","ol/control":"6Pehg","ol/coordinate":"85Vu7","ol/layer":"7gUkr","ol/source/Vector":"9w7Fr","ol/proj":"SznqC","ol/style":"hEQxF","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3","ol/geom":"8Nc7o","./earth":"5nMw7","./TrackOnSphere":"hwaZu","./tcx-parser":"fotmH"}],"2wn4y":[function() {},{}],"5x5oh":[function(require,module,exports) {
+},{"ol/ol.css":"2wn4y","ol/source":"5x5oh","ol":"3a1E4","ol/control":"6Pehg","ol/coordinate":"85Vu7","ol/geom":"8Nc7o","ol/layer":"7gUkr","ol/source/Vector":"9w7Fr","ol/proj":"SznqC","ol/style":"hEQxF","./TrackOnSphere":"hwaZu","./earth":"5nMw7","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3","./data":"6C1am"}],"2wn4y":[function() {},{}],"5x5oh":[function(require,module,exports) {
 /**
  * @module ol/source
  */ var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
@@ -36827,13 +36735,7 @@ function renderFeature(replayGroup, feature, style, squaredTolerance, listener, 
     }
 }
 
-},{"../ImageState.js":"c4jJS","../util.js":"pLBjQ","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"5nMw7":[function(require,module,exports) {
-var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
-parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "EARTH_AVERAGE_RADIUS_METERS", ()=>EARTH_AVERAGE_RADIUS_METERS);
-const EARTH_AVERAGE_RADIUS_METERS = 6371000;
-
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"hwaZu":[function(require,module,exports) {
+},{"../ImageState.js":"c4jJS","../util.js":"pLBjQ","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"hwaZu":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
 parcelHelpers.export(exports, "TrackOnSphere", ()=>TrackOnSphere);
@@ -37088,61 +36990,86 @@ class CircleOnSphere {
     }
 }
 
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"fotmH":[function(require,module,exports) {
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"5nMw7":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "parseTCX", ()=>parseTCX);
-parcelHelpers.export(exports, "writeTCX", ()=>writeTCX);
-function convertToNumber(content) {
-    if (content) return Number(content);
-}
-function parseTCX(fileContents) {
-    const domParser = new DOMParser();
-    const xmlDoc = domParser.parseFromString(fileContents, "text/xml");
-    const activity = xmlDoc.getElementsByTagName("Activity")[0];
-    const trackpointElements = xmlDoc.getElementsByTagName("Trackpoint");
-    const points = [];
-    for(let i = 0; i < trackpointElements.length; ++i){
-        const trackpointElement = trackpointElements[i];
-        points.push({
-            time: trackpointElement.getElementsByTagName("Time")[0].textContent,
-            hr: convertToNumber(trackpointElement.getElementsByTagName("HeartRateBpm")[0]?.getElementsByTagName("Value")[0]?.textContent),
-            distance: convertToNumber(trackpointElement.getElementsByTagName("DistanceMeters")[0]?.textContent),
-            lon: convertToNumber(trackpointElement.getElementsByTagName("Position")[0]?.getElementsByTagName("LongitudeDegrees")[0].textContent),
-            lat: convertToNumber(trackpointElement.getElementsByTagName("Position")[0]?.getElementsByTagName("LatitudeDegrees")[0].textContent),
-            speed: convertToNumber(trackpointElement.getElementsByTagName("Extensions")[0]?.getElementsByTagName("Speed")[0]?.textContent),
-            cadence: convertToNumber(trackpointElement.getElementsByTagName("Extensions")[0]?.getElementsByTagName("RunCadence")[0]?.textContent),
-            watts: convertToNumber(trackpointElement.getElementsByTagName("Extensions")[0]?.getElementsByTagName("Watts")[0]?.textContent)
-        });
-    }
-    return {
-        trackPoints: points
-    };
-}
-function writeTCX(data) {
-    const xmlDoc = document.implementation.createDocument(null, "TrainingCenterDatabase", null);
-    const trainingCenterDatabase = xmlDoc.documentElement;
-    const activity = trainingCenterDatabase.appendChild(xmlDoc.createElement("Activities")).appendChild(xmlDoc.createElement("Activity"));
-    activity.setAttribute("Sport", "Running");
-    activity.appendChild(xmlDoc.createElement("Id")).textContent = data.trackPoints[0].time;
-    const lap = activity.appendChild(xmlDoc.createElement("Lap"));
-    lap.setAttribute("StartTime", data.trackPoints[0].time);
-    const track = lap.appendChild(xmlDoc.createElement("Track"));
-    for (const point of data.trackPoints){
-        const trackpointElement = track.appendChild(xmlDoc.createElement("Trackpoint"));
-        trackpointElement.appendChild(xmlDoc.createElement("Time")).textContent = point.time;
-        trackpointElement.appendChild(xmlDoc.createElement("DistanceMeters")).textContent = String(point.distance);
-        const position = trackpointElement.appendChild(xmlDoc.createElement("Position"));
-        position.appendChild(xmlDoc.createElement("LatitudeDegrees")).textContent = String(point.lat);
-        position.appendChild(xmlDoc.createElement("LongitudeDegrees")).textContent = String(point.lon);
-        if (point.hr) trackpointElement.appendChild(xmlDoc.createElement("HeartRateBpm")).appendChild(xmlDoc.createElement("Value")).textContent = String(point.hr);
-        const tpx = trackpointElement.appendChild(xmlDoc.createElement("Extensions")).appendChild(xmlDoc.createElement("TPX"));
-        if (point.speed) tpx.appendChild(xmlDoc.createElement("Speed")).textContent = String(point.speed);
-        if (point.cadence) tpx.appendChild(xmlDoc.createElement("RunCadence")).textContent = String(point.cadence);
-        if (point.watts) tpx.appendChild(xmlDoc.createElement("Watts")).textContent = String(point.watts);
-    }
-    return '<?xml version="1.0" encoding="UTF-8"?>' + new XMLSerializer().serializeToString(xmlDoc);
-}
+parcelHelpers.export(exports, "EARTH_AVERAGE_RADIUS_METERS", ()=>EARTH_AVERAGE_RADIUS_METERS);
+const EARTH_AVERAGE_RADIUS_METERS = 6371000;
+
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"6C1am":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "UNFIT_DATA", ()=>UNFIT_DATA);
+const UNFIT_DATA = [
+    [
+        -122.25840931691242,
+        37.79509226982509
+    ],
+    [
+        -122.25886168998738,
+        37.795276095212344
+    ],
+    [
+        -122.2592861395624,
+        37.795365466056595
+    ],
+    [
+        -122.25930950072556,
+        37.79509265784988
+    ],
+    [
+        -122.25956825831271,
+        37.79471894674482
+    ],
+    [
+        -122.25943410525116,
+        37.79443544617553
+    ],
+    [
+        -122.25921155164454,
+        37.79424582766565
+    ],
+    [
+        -122.2588342616115,
+        37.79391743717568
+    ],
+    [
+        -122.25846106178584,
+        37.79353057321977
+    ],
+    [
+        -122.25815515911124,
+        37.79353482972478
+    ],
+    [
+        -122.25765040881592,
+        37.79376088886386
+    ],
+    [
+        -122.25762401646548,
+        37.79385681194833
+    ],
+    [
+        -122.25762454095903,
+        37.79392074189134
+    ],
+    [
+        -122.25762480719801,
+        37.79429482852795
+    ],
+    [
+        -122.25787484084675,
+        37.794576709973
+    ],
+    [
+        -122.25830761871863,
+        37.794982560462756
+    ],
+    [
+        -122.25836542107453,
+        37.795112612528385
+    ]
+];
 
 },{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}]},["fm8Gy","h7u1C"], "h7u1C", "parcelRequireb317")
 
